@@ -4,7 +4,7 @@ import math
 # ==============================
 # LOAD JSON DATA
 # ==============================
-with open("transformed_data.json", "r", encoding="utf-8") as f:
+with open("merged_cleaned.json", "r", encoding="utf-8") as f:
     data = json.load(f)
 
 transformed_data = []

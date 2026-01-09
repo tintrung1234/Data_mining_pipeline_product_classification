@@ -4,7 +4,7 @@ import pandas as pd
 # 0. LOAD DATA (JSON)
 # ==============================
 
-df = pd.read_json("transformed_data.json")
+df = pd.read_json("featured_data.json")
 
 # ==============================
 # 1. TÍNH PERCENTILE
