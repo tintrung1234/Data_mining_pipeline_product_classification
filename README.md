@@ -1,93 +1,73 @@
-# Labeling sản phẩm từ `transformed_data.json`
+# Quy trình Xử lý và Gán nhãn Dữ liệu (Data Mining Pipeline)
 
-Repo nhỏ này dùng để **gán nhãn (label)** cho từng sản phẩm dựa trên các chỉ số đã được transform sẵn trong file JSON.
+Tài liệu này mô tả chi tiết 3 quy trình chính trong việc xử lý dữ liệu: **Làm sạch (Data Cleaning)**, **Tạo đặc trưng (Feature Engineering)**, và **Gán nhãn (Data Labeling)**.
 
-## File trong thư mục
+---
 
-- `labeling.py`: Script đọc dữ liệu, tính percentile và gán nhãn.
-- `transformed_data.json`: Dữ liệu đầu vào (đã transform).
-- `labeled_data.json`: Dữ liệu đầu ra sau khi gán nhãn (được tạo ra khi chạy script).
+## 1. Làm sạch dữ liệu (`data_cleaning.py`)
 
-## Yêu cầu
+**Mục đích:**
+Chuẩn hóa dữ liệu thô từ nhiều nguồn khác nhau về một định dạng thống nhất để phục vụ cho các bước phân tích tiếp theo.
 
-- Python 3.8+ (khuyến nghị 3.10+)
-- Thư viện: `pandas`
+*   **Input:** `merged_all_data.json`
+*   **Output:** `clean_data.json`
 
-Cài đặt:
+**Các bước xử lý chính:**
+1.  **Thêm nguồn dữ liệu (Source):** Ghi nhận tên file nguồn vào cột `source`.
+2.  **Chọn cột (Schema-Agnostic):** Tự động tìm và ánh xạ các cột quan trọng (`price`, `sold`, `rating`, `id`) từ các tên biến thể khác nhau (ví dụ: `price_sale`, `price`, `sales`, `sold_count`...).
+3.  **Xóa trùng lặp:** Loại bỏ các bản ghi trùng dựa trên `id` và `source`.
+4.  **Xử lý giá trị thiếu (Missing Values):**
+    *   Xóa dòng nếu thiếu giá trị `price`.
+    *   Điền `0` nếu thiếu dữ liệu bán (`sold`).
+    *   Điền giá trị trung vị (median) nếu thiếu `rating`.
+5.  **Chuẩn hóa kiểu dữ liệu:**
+    *   **Price:** Loại bỏ ký tự không phải số (ví dụ: "120.000đ" -> 120000), chuyển sang kiểu số nguyên.
+    *   **Sold:** Chuyển đổi các định dạng rút gọn (ví dụ: "1.2k" -> 1200, "10+" -> 10).
+    *   **Rating:** Giới hạn giá trị trong khoảng [0, 5].
 
-```bash
-pip install pandas
-```
+---
 
-## Cách chạy
+## 2. Trích xuất đặc trưng (`feature.py`)
 
-Chạy trong đúng thư mục chứa file:
+**Mục đích:**
+Tạo ra các đặc trưng mới (new features) từ dữ liệu gốc để đo lường độ phổ biến, tốc độ bán và chất lượng sản phẩm một cách định lượng.
 
-```bash
-python labeling.py
-```
+*   **Input:** `transformed_data.json` (Lưu ý: Code hiện tại đọc file này, cần đảm bảo dữ liệu đầu vào có các trường `quantity_sold_value`, `rating_average`, `review_count`, `discount_rate`).
+*   **Output:** `featured_data.json`
 
-Sau khi chạy xong, script sẽ tạo file `labeled_data.json` và in ra:
+**Các đặc trưng được tạo:**
+1.  **Sold Velocity (Tốc độ bán tương đối):**
+    *   Công thức: `log(quantity_sold + 1)`
+    *   Ý nghĩa: Giảm sự chênh lệch quá lớn giữa các sản phẩm bán cực chạy và sản phẩm thông thường.
+2.  **Rating Score (Điểm đánh giá có trọng số):**
+    *   Công thức: `rating_avg * log(review_count + 1)`
+    *   Ý nghĩa: Đánh giá cao các sản phẩm có rating cao VÀ nhiều lượt review (tin cậy hơn rating cao nhưng ít review).
+3.  **Discount Percent:**
+    *   Lấy trực tiếp từ `discount_rate`.
+4.  **Popularity Score (Điểm phổ biến):**
+    *   Công thức: `0.7 * quantity_sold + 0.3 * review_count`
+    *   Ý nghĩa: Tổng hợp giữa số lượng bán ra (trọng số cao) và lượng tương tác (review).
 
-```
-Gán nhãn hoàn tất – Đã xuất labeled_data.json
-```
+---
 
-## Input / Output
+## 3. Gán nhãn dữ liệu (`labeling.py`)
 
-### Input: `transformed_data.json`
+**Mục đích:**
+Phân loại sản phẩm vào các nhóm nhãn (`label`) cụ thể dựa trên các ngưỡng thống kê (percentile) của các đặc trưng đã tạo.
 
-Script hiện đang đọc bằng:
+*   **Input:** `transformed_data.json` (Code hiện tại đọc file này, yêu cầu phải chứa các trường feature đã tạo ở bước 2 như `sold_velocity`, `rating_score`...).
+*   **Output:** `labeled_data.json`
 
-```python
-df = pd.read_json("transformed_data.json")
-```
+**Logic gán nhãn:**
+Code tính toán các phân vị (percentile) 70%, 80%, 85% của dữ liệu để làm ngưỡng so sánh. Quy tắc ưu tiên từ trên xuống dưới:
 
-Vì vậy file JSON cần nằm cùng thư mục và có các cột tối thiểu:
+1.  **ƯU ĐÃI (`uu_dai`):**
+    *   Điều kiện: `discount_percent` >= Top 15% cao nhất (85th percentile).
+2.  **BÁN CHẠY (`ban_chay`):**
+    *   Điều kiện: `sold_velocity` >= Top 20% **VÀ** `popularity_score` >= Top 20%.
+3.  **HOT TREND (`hot_trend`):**
+    *   Điều kiện: `sold_velocity` >= Top 30% **VÀ** `rating_score` >= Top 20%.
+4.  **BÌNH THƯỜNG (`binh_thuong`):**
+    *   Các trường hợp còn lại.
 
-- `sold_velocity`
-- `rating_score`
-- `discount_percent`
-- `popularity_score`
-
-### Output: `labeled_data.json`
-
-Script ghi ra JSON dạng mảng record:
-
-- `orient="records"`
-- `force_ascii=False` (giữ tiếng Việt)
-- `indent=2`
-
-Mỗi record sẽ có thêm trường:
-
-- `label`: nhãn được gán
-
-## Logic gán nhãn
-
-Script tính các ngưỡng theo percentile trên toàn bộ dataset:
-
-- `p85_discount` = percentile 85% của `discount_percent`
-- `p80_sold` = percentile 80% của `sold_velocity`
-- `p70_sold` = percentile 70% của `sold_velocity`
-- `p80_rating` = percentile 80% của `rating_score`
-- `p80_popularity` = percentile 80% của `popularity_score`
-
-Hàm gán nhãn (`assign_label`) theo thứ tự ưu tiên:
-
-1. **`uu_dai`**: nếu `discount_percent >= p85_discount`
-2. **`ban_chay`**: nếu `sold_velocity >= p80_sold` và `popularity_score >= p80_popularity`
-3. **`hot_trend`**: nếu `sold_velocity >= p70_sold` và `rating_score >= p80_rating`
-4. **`binh_thuong`**: còn lại
-
-Lưu ý: do có **thứ tự ưu tiên**, nếu một record thỏa nhiều điều kiện thì sẽ nhận nhãn ở điều kiện xuất hiện trước.
-
-## Gợi ý kiểm tra nhanh
-
-Bạn có thể kiểm tra phân bố nhãn sau khi chạy bằng cách mở `labeled_data.json` hoặc in nhanh trong Python:
-
-```python
-import pandas as pd
-
-df = pd.read_json("labeled_data.json")
-print(df["label"].value_counts())
-```
+---
