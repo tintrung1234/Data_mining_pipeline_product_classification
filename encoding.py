@@ -403,7 +403,7 @@ if __name__ == "__main__":
                 return path
         return candidates[0]
 
-    input_file = _resolve_json_path('labeled_data.json')
+    input_file = _resolve_json_path('engineered_features.json')
     output_file = os.path.join(script_dir, 'json', 'encoded_data.json')
     encoder_dir = os.path.join(script_dir, 'json', 'encoders')
 

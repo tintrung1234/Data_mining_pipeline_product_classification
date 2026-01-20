@@ -23,6 +23,7 @@ Tài liệu này mô tả chi tiết quy trình xử lý dữ liệu thương m�
     python lazada_auto_crawl.py
     python clean.py
     python feature.py
+    # labeling mặc định là hybrid (rule seeds + AI model)
     python labeling.py
     python visualize.py
     ```
