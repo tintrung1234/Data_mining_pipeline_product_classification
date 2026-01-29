@@ -115,57 +115,63 @@ class ProductLabeler:
 
     def _calculate_thresholds(self):
         """
-        Tính toán thresholds cho mỗi danh mục
+        Tính toán thresholds cho mỗi danh mục (đã cân bằng)
 
         Best Seller:
-        - quantity_sold >= P75
+        - quantity_sold >= P70
         - rating_average >= 3.8
 
         Best Deal:
-        - discount_intensity_score >= P75
-        - value_score >= P60
+        - discount_intensity_score >= P80
+        - value_score >= P75
 
         Hot Trend:
-        - engagement_score >= P75
+        - engagement_score >= P70
         - popularity_category in ['Viral', 'Hot']
         """
 
-        # Best Seller thresholds
-        q_sold_p75 = self.df['quantity_sold'].quantile(0.75)
-        q_sold_p90 = self.df['quantity_sold'].quantile(0.90)
+        # Best Seller thresholds (giảm mạnh ngưỡng để tăng số lượng)
+        q_sold_p60 = self.df['quantity_sold'].quantile(0.60)
+        q_sold_p70 = self.df['quantity_sold'].quantile(0.70)
+        q_sold_p85 = self.df['quantity_sold'].quantile(0.85)
         rating_threshold = 3.8
 
-        # Best Deal thresholds
-        discount_score_p75 = self.df['discount_intensity_score'].quantile(0.75)
-        value_score_p60 = self.df['value_score'].quantile(0.60)
-        value_score_p70 = self.df['value_score'].quantile(0.70)
+        # Best Deal thresholds (tăng mạnh ngưỡng để giảm số lượng)
+        discount_score_p80 = self.df['discount_intensity_score'].quantile(0.80)
+        discount_score_p85 = self.df['discount_intensity_score'].quantile(0.85)
+        value_score_p75 = self.df['value_score'].quantile(0.75)
+        value_score_p80 = self.df['value_score'].quantile(0.80)
 
-        # Hot Trend thresholds
+        # Hot Trend thresholds (giữ vừa phải)
+        engagement_score_p65 = self.df['engagement_score'].quantile(0.65)
+        engagement_score_p70 = self.df['engagement_score'].quantile(0.70)
         engagement_score_p75 = self.df['engagement_score'].quantile(0.75)
-        engagement_score_p85 = self.df['engagement_score'].quantile(0.85)
 
         self.thresholds = {
             'best_seller': {
-                'quantity_sold_p75': q_sold_p75,
-                'quantity_sold_p90': q_sold_p90,
+                'quantity_sold_p60': q_sold_p60,
+                'quantity_sold_p70': q_sold_p70,
+                'quantity_sold_p85': q_sold_p85,
                 'rating': rating_threshold
             },
             'best_deal': {
-                'discount_score_p75': discount_score_p75,
-                'value_score_p60': value_score_p60,
-                'value_score_p70': value_score_p70
+                'discount_score_p80': discount_score_p80,
+                'discount_score_p85': discount_score_p85,
+                'value_score_p75': value_score_p75,
+                'value_score_p80': value_score_p80
             },
             'hot_trend': {
-                'engagement_score_p75': engagement_score_p75,
-                'engagement_score_p85': engagement_score_p85
+                'engagement_score_p65': engagement_score_p65,
+                'engagement_score_p70': engagement_score_p70,
+                'engagement_score_p75': engagement_score_p75
             }
         }
 
-        print(f"   Best Seller - quantity_sold >= {q_sold_p75:,.0f}")
+        print(f"   Best Seller - quantity_sold >= {q_sold_p70:,.0f} (P70)")
         print(
-            f"   Best Deal - discount_score >= {discount_score_p75:.2f} & value_score >= {value_score_p60:.2f}")
+            f"   Best Deal - discount_score >= {discount_score_p80:.2f} (P80) & value_score >= {value_score_p75:.2f} (P75)")
         print(
-            f"   Hot Trend - engagement_score >= {engagement_score_p75:.2f}")
+            f"   Hot Trend - engagement_score >= {engagement_score_p70:.2f} (P70)")
 
     def _assign_labels(self):
         """
@@ -190,37 +196,46 @@ class ProductLabeler:
             discount_intensity = row['discount_intensity']
 
             # Thresholds
-            q_sold_p90 = self.thresholds['best_seller']['quantity_sold_p90']
-            q_sold_p75 = self.thresholds['best_seller']['quantity_sold_p75']
+            q_sold_p85 = self.thresholds['best_seller']['quantity_sold_p85']
+            q_sold_p70 = self.thresholds['best_seller']['quantity_sold_p70']
+            q_sold_p60 = self.thresholds['best_seller']['quantity_sold_p60']
             rating_th = self.thresholds['best_seller']['rating']
 
-            discount_score_p75 = self.thresholds['best_deal']['discount_score_p75']
-            value_score_p70 = self.thresholds['best_deal']['value_score_p70']
-            value_score_p60 = self.thresholds['best_deal']['value_score_p60']
+            discount_score_p80 = self.thresholds['best_deal']['discount_score_p80']
+            discount_score_p85 = self.thresholds['best_deal']['discount_score_p85']
+            value_score_p75 = self.thresholds['best_deal']['value_score_p75']
+            value_score_p80 = self.thresholds['best_deal']['value_score_p80']
 
-            engagement_p85 = self.thresholds['hot_trend']['engagement_score_p85']
+            engagement_p65 = self.thresholds['hot_trend']['engagement_score_p65']
+            engagement_p70 = self.thresholds['hot_trend']['engagement_score_p70']
             engagement_p75 = self.thresholds['hot_trend']['engagement_score_p75']
 
-            # Priority 1: Best Seller
-            # Sản phẩm bán chạy nhất - quantity cao + rating tốt + lifecycle mature
-            if (quantity_sold >= q_sold_p90 and rating >= rating_th):
-                return 'Best Seller'
-            elif (quantity_sold >= q_sold_p75 and rating >= 4.0 and lifecycle == 'Maturity'):
-                return 'Best Seller'
-
-            # Priority 2: Best Deal
-            # Sản phẩm có giá trị tốt - discount cao + value_score cao
-            if (discount_score >= discount_score_p75 and value_score >= value_score_p70):
-                return 'Best Deal'
-            elif (discount_intensity in ['Aggressive', 'Heavy'] and value_score >= value_score_p60):
-                return 'Best Deal'
-
-            # Priority 3: Hot Trend
+            # Priority 1: Hot Trend
             # Sản phẩm nổi trào - engagement cao + popularity cao
-            if (engagement_score >= engagement_p85 and popularity in ['Viral', 'Hot']):
+            if (engagement_score >= engagement_p75 and popularity in ['Viral', 'Hot']):
                 return 'Hot Trend'
-            elif (engagement_score >= engagement_p75 and popularity == 'Viral'):
+            elif (engagement_score >= engagement_p70 and popularity == 'Viral'):
                 return 'Hot Trend'
+            elif (engagement_score >= engagement_p65 and popularity in ['Viral', 'Hot'] and lifecycle in ['Introduction', 'Growth']):
+                return 'Hot Trend'
+
+            # Priority 2: Best Seller (giảm ngưỡng mạnh để tăng số lượng)
+            # Sản phẩm bán chạy nhất - quantity cao + rating tốt
+            if (quantity_sold >= q_sold_p85 and rating >= 4.0 and lifecycle == 'Maturity'):
+                return 'Best Seller'
+            elif (quantity_sold >= q_sold_p70 and rating >= 4.2):
+                return 'Best Seller'
+            elif (quantity_sold >= q_sold_p60 and rating >= 4.5):
+                return 'Best Seller'
+
+            # Priority 3: Best Deal (tăng mạnh ngưỡng để giảm số lượng)
+            # Sản phẩm có giá trị tốt - discount cao + value_score cao
+            if (discount_score >= discount_score_p85 and value_score >= value_score_p80):
+                return 'Best Deal'
+            elif (discount_intensity in ['Aggressive', 'Heavy'] and value_score >= value_score_p75 and discount_score >= discount_score_p80):
+                return 'Best Deal'
+            elif (discount_score >= discount_score_p80 and value_score >= value_score_p80):
+                return 'Best Deal'
 
             # Default: Normal
             return 'Normal'
@@ -243,15 +258,18 @@ class ProductLabeler:
         Các sản phẩm không chắc chắn -> seed_label = NaN.
         """
 
-        q_sold_p90 = self.thresholds['best_seller']['quantity_sold_p90']
-        q_sold_p75 = self.thresholds['best_seller']['quantity_sold_p75']
+        q_sold_p85 = self.thresholds['best_seller']['quantity_sold_p85']
+        q_sold_p70 = self.thresholds['best_seller']['quantity_sold_p70']
+        q_sold_p60 = self.thresholds['best_seller']['quantity_sold_p60']
         rating_th = self.thresholds['best_seller']['rating']
 
-        discount_score_p75 = self.thresholds['best_deal']['discount_score_p75']
-        value_score_p70 = self.thresholds['best_deal']['value_score_p70']
-        value_score_p60 = self.thresholds['best_deal']['value_score_p60']
+        discount_score_p80 = self.thresholds['best_deal']['discount_score_p80']
+        discount_score_p85 = self.thresholds['best_deal']['discount_score_p85']
+        value_score_p75 = self.thresholds['best_deal']['value_score_p75']
+        value_score_p80 = self.thresholds['best_deal']['value_score_p80']
 
-        engagement_p85 = self.thresholds['hot_trend']['engagement_score_p85']
+        engagement_p65 = self.thresholds['hot_trend']['engagement_score_p65']
+        engagement_p70 = self.thresholds['hot_trend']['engagement_score_p70']
         engagement_p75 = self.thresholds['hot_trend']['engagement_score_p75']
 
         def seed_rule(row):
@@ -264,28 +282,32 @@ class ProductLabeler:
             lifecycle = row.get('lifecycle_status', None)
             discount_intensity = row.get('discount_intensity', None)
 
-            # Seed for Best Seller (stricter than full rules)
-            if pd.notna(quantity_sold) and pd.notna(rating):
-                if (quantity_sold >= q_sold_p90 and rating >= max(rating_th, 4.2)):
-                    return 'Best Seller', 'seed: sold>=p90 & rating>=4.2'
-                if (quantity_sold >= q_sold_p75 and rating >= 4.5 and lifecycle == 'Maturity'):
-                    return 'Best Seller', 'seed: sold>=p75 & rating>=4.5 & maturity'
-
-            # Seed for Best Deal
-            if pd.notna(discount_score) and pd.notna(value_score):
-                if (discount_score >= discount_score_p75 and value_score >= value_score_p70 and discount_intensity in ['Aggressive', 'Heavy']):
-                    return 'Best Deal', 'seed: high discount_score & value & aggressive/heavy'
-                if (discount_intensity == 'Aggressive' and value_score >= value_score_p70):
-                    return 'Best Deal', 'seed: aggressive discount & value>=p70'
-                if (discount_score >= discount_score_p75 and value_score >= (value_score_p70 + (value_score_p70 - value_score_p60) * 0.5)):
-                    return 'Best Deal', 'seed: very high discount_score & very high value'
-
-            # Seed for Hot Trend
+            # Seed for Hot Trend (giữ ngưỡng vừa phải)
             if pd.notna(engagement_score):
-                if (engagement_score >= engagement_p85 and popularity in ['Viral', 'Hot']):
-                    return 'Hot Trend', 'seed: engagement>=p85 & viral/hot'
-                if (engagement_score >= engagement_p75 and popularity == 'Viral' and lifecycle in ['Growth', 'Introduction']):
-                    return 'Hot Trend', 'seed: viral & engagement>=p75 & early lifecycle'
+                if (engagement_score >= engagement_p75 and popularity in ['Viral', 'Hot']):
+                    return 'Hot Trend', 'seed: engagement>=p75 & viral/hot'
+                if (engagement_score >= engagement_p70 and popularity == 'Viral'):
+                    return 'Hot Trend', 'seed: engagement>=p70 & viral'
+                if (engagement_score >= engagement_p65 and popularity in ['Viral', 'Hot'] and lifecycle in ['Introduction', 'Growth']):
+                    return 'Hot Trend', 'seed: engagement>=p65 & viral/hot & early lifecycle'
+
+            # Seed for Best Seller (giảm ngưỡng để tăng seeds)
+            if pd.notna(quantity_sold) and pd.notna(rating):
+                if (quantity_sold >= q_sold_p85 and rating >= 4.0 and lifecycle == 'Maturity'):
+                    return 'Best Seller', 'seed: sold>=p85 & rating>=4.0 & maturity'
+                if (quantity_sold >= q_sold_p70 and rating >= 4.3):
+                    return 'Best Seller', 'seed: sold>=p70 & rating>=4.3'
+                if (quantity_sold >= q_sold_p60 and rating >= 4.6):
+                    return 'Best Seller', 'seed: sold>=p60 & rating>=4.6'
+
+            # Seed for Best Deal (tăng mạnh ngưỡng để giảm seeds)
+            if pd.notna(discount_score) and pd.notna(value_score):
+                if (discount_score >= discount_score_p85 and value_score >= value_score_p80 and discount_intensity in ['Aggressive', 'Heavy']):
+                    return 'Best Deal', 'seed: very high discount_score & value & aggressive/heavy'
+                if (discount_intensity == 'Aggressive' and value_score >= value_score_p80 and discount_score >= discount_score_p85):
+                    return 'Best Deal', 'seed: aggressive discount & value>=p80 & discount>=p85'
+                if (discount_score >= discount_score_p80 and value_score >= value_score_p80):
+                    return 'Best Deal', 'seed: discount>=p80 & value>=p80'
 
             return np.nan, np.nan
 

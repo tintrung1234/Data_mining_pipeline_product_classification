@@ -292,30 +292,8 @@ def create_encoding(input_file: str, output_file: Optional[str] = None,
     print(f"✓ Features: {X.shape[1]}")
 
     if y is not None:
-        # Stratified split requires each class to have at least 2 samples,
-        # and test/train sizes large enough to contain all classes.
-        label_counts = y.value_counts()
-        n_classes = int(label_counts.shape[0])
-        n_samples = int(len(y))
-        n_test = int(round(n_samples * test_size))
-        n_train = n_samples - n_test
-
-        can_stratify = True
-        if label_counts.min() < 2:
-            can_stratify = False
-        if n_test < n_classes or n_train < n_classes:
-            can_stratify = False
-
-        if not can_stratify:
-            print("\n⚠️  Không thể stratify train/test split vì có lớp quá ít mẫu hoặc tập test/train quá nhỏ.")
-            print("   → Sẽ split KHÔNG stratify để tránh lỗi.")
-            print(f"   Label counts: {label_counts.to_dict()}")
-            stratify_arg = None
-        else:
-            stratify_arg = y
-
         X_train, X_test, y_train, y_test = train_test_split(
-            X, y, test_size=test_size, random_state=42, stratify=stratify_arg
+            X, y, test_size=test_size, random_state=42, stratify=y
         )
 
         print(f"\nTrain set: {len(X_train):,} ({(1-test_size)*100:.0f}%)")
@@ -389,31 +367,10 @@ def create_encoding(input_file: str, output_file: Optional[str] = None,
 
 
 if __name__ == "__main__":
-    # Default: resolve paths relative to this script's folder (workspace `code/`).
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-
-    def _resolve_json_path(filename: str) -> str:
-        """Try common locations for the json folder."""
-        candidates = [
-            os.path.join(script_dir, 'json', filename),
-            os.path.join(os.path.dirname(script_dir), 'json', filename),
-        ]
-        for path in candidates:
-            if os.path.exists(path):
-                return path
-        return candidates[0]
-
-    input_file = _resolve_json_path('engineered_features.json')
-    output_file = os.path.join(script_dir, 'json', 'encoded_data.json')
-    encoder_dir = os.path.join(script_dir, 'json', 'encoders')
-
-    if not os.path.exists(input_file):
-        raise FileNotFoundError(
-            "Không tìm thấy file labeled_data.json. "
-            f"Đã thử: {os.path.join(script_dir, 'json', 'labeled_data.json')} và "
-            f"{os.path.join(os.path.dirname(script_dir), 'json', 'labeled_data.json')}. "
-            "Hãy kiểm tra lại folder json/ trong workspace."
-        )
+    base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    input_file = os.path.join(base, 'data/transformation/labeled_data.json')
+    output_file = os.path.join(base, 'data/transformation/encoded_data.json')
+    encoder_dir = os.path.join(base, 'data/transformation/encoders')
 
     X_train, X_test, y_train, y_test, info = create_encoding(
         input_file, output_file, encoder_dir, test_size=0.2
